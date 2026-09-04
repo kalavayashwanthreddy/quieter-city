@@ -1,0 +1,61 @@
+// Copy these rules into Firebase Console → Firestore Database → Rules.
+// Raw samples remain private; only aggregated map views are public.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /noise_samples/{docId} {
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll(['uid', 'sessionId', 'geohash', 'dba'])
+        && request.resource.data.geohash is string
+        && request.resource.data.geohash.size() == 7
+        && request.resource.data.dba is number
+        && request.resource.data.dba >= 0
+        && request.resource.data.dba <= 140
+        && !('lat' in request.resource.data)
+        && !('lng' in request.resource.data)
+        && !('latitude' in request.resource.data)
+        && !('longitude' in request.resource.data)
+        && !('audio' in request.resource.data)
+        && !('waveform' in request.resource.data)
+        && !('pcm' in request.resource.data)
+        && !('deviceId' in request.resource.data)
+        && !('userAgent' in request.resource.data)
+        && !('ip' in request.resource.data);
+      allow read, update, delete: if false;
+    }
+
+    match /noise_cells/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /predictions/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /alerts/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /admins/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /notification_subscriptions/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /notifications/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /rewards/{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "name": "quieter-city",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Privacy-first crowdsourced acoustic platform: on-device noise sensing, live heatmap, noise-aware routing, hotspot prediction, admin alerts.",
+  "scripts": {
+    "postinstall": "node scripts/copy-wasm.mjs",
+    "dev": "concurrently -k -n api,web -c blue,green \"node backend/server.js\" \"vite\"",
+    "dev:web": "vite",
+    "dev:api": "node backend/server.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "sim:once": "node backend/seedSimulator.js --once",
+    "verify": "node scripts/verify.mjs",
+    "check": "node --check backend/server.js && node --check backend/security.js && node --check backend/aggregate.js && node --check backend/predict.js && node --check backend/alerts.js && node --check backend/store.js && node --check backend/config.js && node --check backend/firebaseAdmin.js && node --check backend/auth.js && node --check backend/seedSimulator.js && node --check backend/antiAbuse.js && node --check backend/notifications.js"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-audio": "^0.10.14",
+    "express": "^4.22.2",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^13.5.0",
+    "leaflet": "^1.9.4",
+    "leaflet.heat": "^0.2.0",
+    "ngeohash": "^0.6.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "uuid": "^14.0.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "concurrently": "^9.0.1",
+    "vite": "^5.4.8"
+  },
+  "overrides": {
+    "qs": "6.16.0",
+    "body-parser": "1.20.6",
+    "esbuild": "^0.25.0"
+  }
+}

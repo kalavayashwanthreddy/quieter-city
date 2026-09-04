@@ -1,0 +1,2 @@
+npm notice run quieter-city@0.1.0 dev
+npm notice run concurrently -k -n api,web -c blue,green "node backend/server.js" "vite"
