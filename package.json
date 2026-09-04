@@ -9,6 +9,7 @@
     "dev": "concurrently -k -n api,web -c blue,green \"node backend/server.js\" \"vite\"",
     "dev:web": "vite",
     "dev:api": "node backend/server.js",
+    "start": "node backend/server.js",
     "build": "vite build",
     "preview": "vite preview",
     "sim:once": "node backend/seedSimulator.js --once",

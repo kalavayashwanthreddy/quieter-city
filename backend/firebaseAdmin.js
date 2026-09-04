@@ -13,6 +13,7 @@ async function loadSdk() {
       import('firebase-admin/auth'),
     ]).then(([appSdk, firestoreSdk, authSdk]) => ({
       ...appSdk,
+      cert: appSdk.cert,
       getFirestore: firestoreSdk.getFirestore,
       getAuth: authSdk.getAuth,
     }));
@@ -24,16 +25,34 @@ export function firestoreEnabled() {
   return CONFIG.storageBackend === 'firestore';
 }
 
+function serviceAccountCredential(cert) {
+  const encoded = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON ||
+    (encoded ? Buffer.from(encoded, 'base64').toString('utf8') : '');
+
+  if (!raw.trim()) return null;
+
+  let serviceAccount;
+  try {
+    serviceAccount = JSON.parse(raw);
+  } catch {
+    throw new Error('FIREBASE_SERVICE_ACCOUNT_JSON/BASE64 is not valid JSON.');
+  }
+
+  return cert(serviceAccount);
+}
+
 export async function getFirebaseAdmin() {
   if (!firestoreEnabled()) {
     throw new Error('Firebase Admin is disabled; set STORAGE_BACKEND=firestore.');
   }
   if (!appPromise) {
-    appPromise = loadSdk().then(({ getApps, initializeApp, applicationDefault }) => {
+    appPromise = loadSdk().then(({ getApps, initializeApp, applicationDefault, cert }) => {
       const existing = getApps();
       if (existing.length) return existing[0];
+      const credential = serviceAccountCredential(cert) || applicationDefault();
       return initializeApp({
-        credential: applicationDefault(),
+        credential,
         projectId: CONFIG.firebaseProjectId,
       });
     });

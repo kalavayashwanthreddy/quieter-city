@@ -1,6 +1,8 @@
 // Express API for FreeBuff. STORAGE_BACKEND=firestore uses Firebase Admin
 // and Firestore; local development retains the JSON-file fallback.
 import express from 'express';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CONFIG } from './config.js';
 import {
   ensureLoaded,
@@ -23,6 +25,8 @@ import { derivePseudonym, verifyFirebaseToken } from './auth.js';
 import { computeReward, emptyRewards, localDayKey } from '../src/shared/rewards.js';
 
 const app = express();
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const DIST_DIR = path.join(PROJECT_ROOT, 'dist');
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
 
@@ -227,6 +231,15 @@ app.post('/api/reset', adminOnly, asyncHandler(async (req, res) => {
   if (wasRunning) simulator.start();
   res.json({ ok: true });
 }));
+
+// Render runs one web service for both the Vite frontend and the API.
+app.use(express.static(DIST_DIR, { index: 'index.html' }));
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  return res.sendFile(path.join(DIST_DIR, 'index.html'), (error) => {
+    if (error) next(error);
+  });
+});
 
 app.use((req, res) => res.status(404).json({ ok: false, error: 'not-found' }));
 app.use((err, req, res, next) => {
