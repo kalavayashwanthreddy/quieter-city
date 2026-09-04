@@ -104,18 +104,23 @@ export function scheduleSave() {
 
 export async function addSample(sample) {
   const current = await ensureLoaded();
+  // Browser submissions already receive an id in server.js, but the built-in
+  // simulator calls this adapter directly. Always assign a unique id here as
+  // a final safety boundary so simulator samples cannot overwrite one another
+  // in Firestore under the literal key "undefined".
+  const storedSample = sample.id ? sample : { ...sample, id: crypto.randomUUID() };
   if (firestoreEnabled()) {
-    await (await db()).collection(COLLECTIONS.samples).doc(String(sample.id)).set({
-      ...sample,
+    await (await db()).collection(COLLECTIONS.samples).doc(String(storedSample.id)).set({
+      ...storedSample,
       createdAt: new Date(),
     });
   }
-  current.samples.push(sample);
+  current.samples.push(storedSample);
   if (current.samples.length > CONFIG.maxSamples) {
     current.samples.splice(0, current.samples.length - CONFIG.maxSamples);
   }
   scheduleSave();
-  return sample;
+  return storedSample;
 }
 
 async function clearCollection(name) {
