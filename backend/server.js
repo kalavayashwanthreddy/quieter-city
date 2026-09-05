@@ -73,18 +73,23 @@ async function requireCitizen(req, res, next) {
   }
 }
 
-async function refreshDerived() {
-  const state = await getState();
-  state.cells = aggregateCells(state);
-  state.predictions = computePredictions(state, state.cells);
-  const now = Date.now();
-  if (now - lastAlertCheck > 10000) {
-    runAlertCheck(state, state.cells);
-    runNotificationCheck(state);
-    lastAlertCheck = now;
-  }
-  await saveDerived(state);
-  return state;
+let refreshInFlight = Promise.resolve();
+async function refreshDerived({ persist = true } = {}) {
+  const task = refreshInFlight.catch(() => {}).then(async () => {
+    const state = await getState();
+    state.cells = aggregateCells(state);
+    state.predictions = computePredictions(state, state.cells);
+    const now = Date.now();
+    if (now - lastAlertCheck > 10000) {
+      runAlertCheck(state, state.cells);
+      runNotificationCheck(state);
+      lastAlertCheck = now;
+    }
+    if (persist) await saveDerived(state);
+    return state;
+  });
+  refreshInFlight = task.catch(() => {});
+  return task;
 }
 
 app.get('/api/health', asyncHandler(async (req, res) => {
@@ -274,7 +279,9 @@ async function boot() {
   await ensureLoaded();
   const state = await getState();
   state.sim = { running: CONFIG.sim.enabled, posted: simulator.posted };
-  await refreshDerived();
+  // Derived collections are rebuilt asynchronously after the server starts.
+  // A Firestore timeout must not make Render's health check fail.
+  await refreshDerived({ persist: false });
   if (CONFIG.sim.enabled) simulator.start();
   setInterval(() => { refreshDerived().catch((error) => console.error('refresh error', error)); }, 15000);
   app.listen(CONFIG.port, () => {
@@ -282,6 +289,7 @@ async function boot() {
     console.log(`   Storage: ${CONFIG.storageBackend} · Firebase project: ${CONFIG.firebaseProjectId}`);
     console.log(`   Auth: ${CONFIG.authRequired ? 'Firebase ID token required' : 'local development bypass'}`);
     console.log(`   City: ${CONFIG.city.name} · simulator: ${CONFIG.sim.enabled ? 'ON' : 'OFF'}`);
+    refreshDerived().catch((error) => console.error('initial persistence error', error));
   });
 }
 
