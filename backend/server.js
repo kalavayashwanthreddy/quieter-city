@@ -148,7 +148,13 @@ app.post('/api/samples', limitSamples, requireCitizen, asyncHandler(async (req, 
       state: awarded.next,
     };
   }
-  await refreshDerived();
+  try {
+    await refreshDerived();
+  } catch (error) {
+    // The sample is already stored. A slow derived-data rebuild must not turn
+    // a successful upload into a client retry/duplicate.
+    console.error('derived refresh after sample write failed', error);
+  }
   res.json({ ok: true, id: sample.id, received: sample.ts, reward });
 }));
 
@@ -221,12 +227,15 @@ app.get('/api/notifications', requireCitizen, asyncHandler(async (req, res) => {
 }));
 
 app.post('/api/sim/start', adminOnly, (req, res) => {
+  if (!CONFIG.sim.enabled) {
+    return res.status(409).json({ ok: false, error: 'simulator-disabled' });
+  }
   simulator.start();
-  res.json({ ok: true, running: true });
+  res.json({ ok: true, running: simulator.running, posted: simulator.posted });
 });
 app.post('/api/sim/stop', adminOnly, (req, res) => {
   simulator.stop();
-  res.json({ ok: true, running: false });
+  res.json({ ok: true, running: simulator.running, posted: simulator.posted });
 });
 
 app.post('/api/reset', adminOnly, asyncHandler(async (req, res) => {
@@ -278,17 +287,17 @@ async function boot() {
   }
   await ensureLoaded();
   const state = await getState();
-  state.sim = { running: CONFIG.sim.enabled, posted: simulator.posted };
+  state.sim = { running: simulator.running, enabled: CONFIG.sim.enabled, posted: simulator.posted };
   // Derived collections are rebuilt asynchronously after the server starts.
   // A Firestore timeout must not make Render's health check fail.
   await refreshDerived({ persist: false });
-  if (CONFIG.sim.enabled) simulator.start();
+  if (CONFIG.sim.enabled && CONFIG.sim.autoStart) simulator.start();
   setInterval(() => { refreshDerived().catch((error) => console.error('refresh error', error)); }, 15000);
   app.listen(CONFIG.port, () => {
     console.log(`🔊 FreeBuff API on http://localhost:${CONFIG.port}`);
     console.log(`   Storage: ${CONFIG.storageBackend} · Firebase project: ${CONFIG.firebaseProjectId}`);
     console.log(`   Auth: ${CONFIG.authRequired ? 'Firebase ID token required' : 'local development bypass'}`);
-    console.log(`   City: ${CONFIG.city.name} · simulator: ${CONFIG.sim.enabled ? 'ON' : 'OFF'}`);
+    console.log(`   City: ${CONFIG.city.name} · simulator: ${CONFIG.sim.enabled ? (CONFIG.sim.autoStart ? 'AUTO' : 'MANUAL') : 'OFF'}`);
     refreshDerived().catch((error) => console.error('initial persistence error', error));
   });
 }

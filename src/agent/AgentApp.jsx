@@ -283,7 +283,7 @@ export default function AgentApp() {
         </div>
 
         {tab === 'heatmap' && (
-          <HeatmapPanel cells={cells} health={health} lastUpdated={lastUpdated} showForecast={showForecast} setShowForecast={setShowForecast} />
+          <HeatmapPanel cells={cells} health={health} lastUpdated={lastUpdated} showForecast={showForecast} setShowForecast={setShowForecast} poll={poll} />
         )}
         {tab === 'routes' && (
           <RoutesPanel
@@ -321,7 +321,25 @@ export default function AgentApp() {
   );
 }
 
-function HeatmapPanel({ cells, health, lastUpdated, showForecast, setShowForecast }) {
+function HeatmapPanel({ cells, health, lastUpdated, showForecast, setShowForecast, poll }) {
+  const [simBusy, setSimBusy] = useState(false);
+  const [simError, setSimError] = useState('');
+
+  const runSimulatorAction = async (action) => {
+    setSimBusy(true);
+    setSimError('');
+    try {
+      if (action === 'start') await api.simStart();
+      else await api.simStop();
+      // Refresh the running/posted state immediately.
+      await poll();
+    } catch (error) {
+      setSimError(error.message || 'Simulator request failed');
+    } finally {
+      setSimBusy(false);
+    }
+  };
+
   return (
     <div className="panel-body">
       <h3>🗺️ Live noise heatmap</h3>
@@ -350,12 +368,20 @@ function HeatmapPanel({ cells, health, lastUpdated, showForecast, setShowForecas
       <hr />
       <h4>Demo controls</h4>
       <div className="row">
-        <button className="btn btn-sm" onClick={() => api.simStart().then(poll)}>▶ Start simulator</button>
-        <button className="btn btn-sm" onClick={() => api.simStop().then(poll)}>⏸ Stop simulator</button>
-        <button className="btn btn-sm btn-danger" onClick={() => { if (confirm('Reset all demo data?')) api.reset().then(poll); }}>
+        <button className="btn btn-sm" disabled={simBusy || health?.sim?.running} onClick={() => runSimulatorAction('start')}>
+          ▶ Start simulator
+        </button>
+        <button className="btn btn-sm" disabled={simBusy || !health?.sim?.running} onClick={() => runSimulatorAction('stop')}>
+          ⏸ Stop simulator
+        </button>
+        <button className="btn btn-sm btn-danger" disabled={simBusy} onClick={() => { if (confirm('Reset all demo data?')) api.reset().then(poll).catch((error) => setSimError(error.message)); }}>
           ♻ Reset data
         </button>
       </div>
+      <p className="muted small">
+        Simulator: {health?.sim?.running ? 'running' : 'stopped'} · generated {health?.sim?.posted ?? 0} readings
+      </p>
+      {simError && <div className="notice bad">{simError}</div>}
     </div>
   );
 }

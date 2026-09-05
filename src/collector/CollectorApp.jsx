@@ -7,7 +7,7 @@ import { buildSessionSample, uploadSample } from './Uploader.js';
 import { REWARDS, NOTIFICATIONS, levelLabel, MODERATE_DBA, LOUD_DBA, DANGEROUS_DBA } from '../shared/schema.js';
 import { cellFor, blurLocation } from '../shared/geohash.js';
 import { getSessionId, localDayKey } from './sessionAndAlerts.js';
-import { api, isApiAuthEnabled } from '../shared/backend.js';
+import { api } from '../shared/backend.js';
 import { isFirebaseConfigured, uploadSampleToFirebase } from './firebase.js';
 import { loadRewards, saveRewards, computeReward } from '../shared/rewards.js';
 
@@ -100,7 +100,10 @@ export default function CollectorApp() {
       }
     }
 
-    const fbOn = isFirebaseConfigured() && !isApiAuthEnabled();
+    // If the API is temporarily unavailable or rejects authentication, retry
+    // the same metadata-only sample directly through Firebase. Never bypass a
+    // deliberate anti-abuse rejection (rate limit or movement check).
+    const fbOn = isFirebaseConfigured() && !localOk && !rejected;
     let firebaseOk = false;
     if (fbOn) {
       try {

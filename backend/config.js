@@ -33,7 +33,10 @@ export const CONFIG = {
   maxSamples: 40000,
 
   sim: {
-    enabled: process.env.SIM_ENABLED !== 'false',
+    // SIM_ENABLED enables the demo simulator feature. It does not start it;
+    // the agent's Start/Stop controls own the running state.
+    enabled: process.env.SIM_ENABLED === 'true',
+    autoStart: process.env.SIM_AUTOSTART === 'true',
     intervalMs: 4000,
     citizens: 16,
     zones: [
