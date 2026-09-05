@@ -249,8 +249,22 @@ app.use((err, req, res, next) => {
   res.status(500).json({ ok: false, error: 'internal' });
 });
 
+let simulatorRefreshTimer = null;
+let simulatorRefreshQueue = Promise.resolve();
+function scheduleSimulatorRefresh() {
+  clearTimeout(simulatorRefreshTimer);
+  simulatorRefreshTimer = setTimeout(() => {
+    simulatorRefreshQueue = simulatorRefreshQueue
+      .catch(() => {})
+      .then(() => refreshDerived())
+      .catch((error) => console.error('simulator refresh error', error));
+  }, 250);
+}
+
 const simulator = new Simulator((sample) => {
-  addSample(sample).then(refreshDerived).catch((error) => console.error('simulator storage error', error));
+  addSample(sample)
+    .then(scheduleSimulatorRefresh)
+    .catch((error) => console.error('simulator storage error', error));
 });
 
 async function boot() {
