@@ -73,6 +73,20 @@ async function requireCitizen(req, res, next) {
   }
 }
 
+// Simulator controls change only synthetic demo data. Accept a valid Firebase
+// anonymous ID token for these controls, while keeping ADMIN_TOKEN private for
+// true administrative operations such as reset and alert acknowledgement.
+async function simulatorControl(req, res, next) {
+  const adminToken = req.get('x-admin-token');
+  if (CONFIG.adminToken && adminToken === CONFIG.adminToken) return next();
+  try {
+    const token = String(req.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    const payload = await verifyFirebaseToken(token);
+    if (payload) return next();
+  } catch { /* fall through to unauthorized */ }
+  return res.status(401).json({ ok: false, error: 'simulator-auth-required' });
+}
+
 let refreshInFlight = Promise.resolve();
 async function refreshDerived({ persist = true } = {}) {
   const task = refreshInFlight.catch(() => {}).then(async () => {
@@ -226,14 +240,14 @@ app.get('/api/notifications', requireCitizen, asyncHandler(async (req, res) => {
   res.json(list);
 }));
 
-app.post('/api/sim/start', adminOnly, (req, res) => {
+app.post('/api/sim/start', simulatorControl, (req, res) => {
   if (!CONFIG.sim.enabled) {
     return res.status(409).json({ ok: false, error: 'simulator-disabled' });
   }
   simulator.start();
   res.json({ ok: true, running: simulator.running, posted: simulator.posted });
 });
-app.post('/api/sim/stop', adminOnly, (req, res) => {
+app.post('/api/sim/stop', simulatorControl, (req, res) => {
   simulator.stop();
   res.json({ ok: true, running: simulator.running, posted: simulator.posted });
 });

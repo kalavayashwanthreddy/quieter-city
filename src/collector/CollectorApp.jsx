@@ -19,6 +19,10 @@ const hourLabel = (h) => {
 };
 
 const fmtSec = (s) => `${Math.round((s || 0) * 10) / 10}s`;
+const withTimeout = (promise, ms, label) => Promise.race([
+  promise,
+  new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms)),
+]);
 
 export default function CollectorApp() {
   const [aiStatus, setAiStatus] = useState('loading'); // loading | ready | error
@@ -90,7 +94,7 @@ export default function CollectorApp() {
     let rejected = null;
     let apiResult = null;
     try {
-      apiResult = await uploadSample(sample);
+      apiResult = await withTimeout(uploadSample(sample), 15000, 'API upload');
       localOk = true;
     } catch (err) {
       if (err.code === 'rate-limited' || err.code === 'movement-suspicious') {
@@ -107,7 +111,7 @@ export default function CollectorApp() {
     let firebaseOk = false;
     if (fbOn) {
       try {
-        await uploadSampleToFirebase(sample);
+        await withTimeout(uploadSampleToFirebase(sample), 15000, 'Firebase upload');
         firebaseOk = true;
       } catch (err) {
         console.error('Firebase upload failed', err);

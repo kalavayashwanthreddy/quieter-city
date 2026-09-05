@@ -4,19 +4,19 @@
 import { API_BASE, ADMIN_TOKEN_KEY, DEFAULT_ADMIN_TOKEN } from './schema.js';
 import { getFirebaseIdToken } from '../collector/firebase.js';
 
-const API_AUTH_ENABLED = import.meta.env.VITE_API_AUTH === 'true';
+const API_AUTH_ENABLED = import.meta.env?.VITE_API_AUTH === 'true';
 
 function adminHeaders() {
   const token =
     (typeof localStorage !== 'undefined' && localStorage.getItem(ADMIN_TOKEN_KEY)) ||
-    import.meta.env.VITE_ADMIN_TOKEN ||
+    import.meta.env?.VITE_ADMIN_TOKEN ||
     DEFAULT_ADMIN_TOKEN;
   return { 'x-admin-token': token };
 }
 
-async function req(path, opts = {}, { auth = false, retried = false } = {}) {
+async function req(path, opts = {}, { auth = false, forceAuth = false, retried = false } = {}) {
   const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-  if (auth && API_AUTH_ENABLED) {
+  if (auth && (API_AUTH_ENABLED || forceAuth)) {
     headers.Authorization = `Bearer ${await getFirebaseIdToken(retried)}`;
   }
 
@@ -42,7 +42,7 @@ export function isApiAuthEnabled() {
 
 export const api = {
   health: () => req('/health'),
-  postSample: (sample) => req('/samples', { method: 'POST', body: JSON.stringify(sample) }, { auth: true }),
+  postSample: (sample) => req('/samples', { method: 'POST', body: JSON.stringify(sample) }, { auth: true, forceAuth: true }),
   getCells: () => req('/cells'),
   getPredictions: () => req('/predictions'),
   getAlerts: () => req('/alerts'),
@@ -53,7 +53,7 @@ export const api = {
   subscribe: (sub) => req('/subscriptions', { method: 'POST', body: JSON.stringify(sub) }, { auth: true }),
   unsubscribe: (subscriberId) => req(`/subscriptions/${encodeURIComponent(subscriberId)}`, { method: 'DELETE' }, { auth: true }),
   getNotifications: (subscriberId) => req(`/notifications?subscriberId=${encodeURIComponent(subscriberId)}`, {}, { auth: true }),
-  simStart: () => req('/sim/start', { method: 'POST', headers: adminHeaders() }),
-  simStop: () => req('/sim/stop', { method: 'POST', headers: adminHeaders() }),
+  simStart: () => req('/sim/start', { method: 'POST', headers: adminHeaders() }, { auth: true, forceAuth: true }),
+  simStop: () => req('/sim/stop', { method: 'POST', headers: adminHeaders() }, { auth: true, forceAuth: true }),
   reset: () => req('/reset', { method: 'POST', headers: adminHeaders() }),
 };
