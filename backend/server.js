@@ -59,6 +59,9 @@ const limitSubscriptions = createRateLimiter(CONFIG.rateLimit.subscriptions);
 const uid = () => 's-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 let lastAlertCheck = 0;
+let simulatorStored = 0;
+let simulatorStorageErrors = 0;
+let simulatorLastStorageError = null;
 
 async function requireCitizen(req, res, next) {
   if (!CONFIG.authRequired) return next();
@@ -117,7 +120,13 @@ app.get('/api/health', asyncHandler(async (req, res) => {
     cells: state.cells.length,
     alerts: state.alerts.filter((a) => a.status === 'active').length,
     predictions: state.predictions.filter((p) => p.hotspot).length,
-    sim: { running: simulator.running, posted: simulator.posted },
+    sim: {
+      running: simulator.running,
+      posted: simulator.posted,
+      stored: simulatorStored,
+      errors: simulatorStorageErrors,
+      lastError: simulatorLastStorageError,
+    },
     time: Date.now(),
   });
 }));
@@ -291,8 +300,15 @@ function scheduleSimulatorRefresh() {
 
 const simulator = new Simulator((sample) => {
   addSample(sample)
-    .then(scheduleSimulatorRefresh)
-    .catch((error) => console.error('simulator storage error', error));
+    .then(() => {
+      simulatorStored += 1;
+      scheduleSimulatorRefresh();
+    })
+    .catch((error) => {
+      simulatorStorageErrors += 1;
+      simulatorLastStorageError = error?.message || String(error);
+      console.error('simulator storage error', error);
+    });
 });
 
 async function boot() {

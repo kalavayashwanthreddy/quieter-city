@@ -92,11 +92,13 @@ export default function CollectorApp() {
   const publishSample = useCallback(async (sample) => {
     let localOk = false;
     let rejected = null;
+    let uploadError = null;
     let apiResult = null;
     try {
       apiResult = await withTimeout(uploadSample(sample), 15000, 'API upload');
       localOk = true;
     } catch (err) {
+      uploadError = err;
       if (err.code === 'rate-limited' || err.code === 'movement-suspicious') {
         rejected = err;
       } else {
@@ -114,6 +116,7 @@ export default function CollectorApp() {
         await withTimeout(uploadSampleToFirebase(sample), 15000, 'Firebase upload');
         firebaseOk = true;
       } catch (err) {
+        uploadError = err;
         console.error('Firebase upload failed', err);
       }
     }
@@ -152,7 +155,7 @@ export default function CollectorApp() {
       addLog({
         dba: sample.dba,
         type: 'error',
-        label: fbOn ? 'cloud sync failed — will retry on next recording' : 'sample not saved — is the API running?',
+        label: `${fbOn ? 'cloud sync failed' : 'sample not saved'} — ${uploadError?.message || 'is the API running?'}`,
       });
     }
     return false;
