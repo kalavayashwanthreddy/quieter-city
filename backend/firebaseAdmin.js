@@ -4,6 +4,7 @@ import { CONFIG } from './config.js';
 
 let sdkPromise;
 let appPromise;
+let firestoreDbPromise;
 
 async function loadSdk() {
   if (!sdkPromise) {
@@ -61,8 +62,17 @@ export async function getFirebaseAdmin() {
 }
 
 export async function getFirestoreDb() {
-  const [{ getFirestore }, app] = await Promise.all([loadSdk(), getFirebaseAdmin()]);
-  return getFirestore(app);
+  if (!firestoreDbPromise) {
+    firestoreDbPromise = Promise.all([loadSdk(), getFirebaseAdmin()]).then(([{ getFirestore }, app]) => {
+      const database = getFirestore(app);
+      // Render deployments can leave the Admin SDK's default gRPC channel
+      // pending indefinitely. REST is slower per request but bounded and
+      // reliable for this demo's low-volume writes.
+      database.settings({ preferRest: true });
+      return database;
+    });
+  }
+  return firestoreDbPromise;
 }
 
 export async function getFirebaseAuth() {

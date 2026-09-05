@@ -110,10 +110,14 @@ export async function addSample(sample) {
   // in Firestore under the literal key "undefined".
   const storedSample = sample.id ? sample : { ...sample, id: crypto.randomUUID() };
   if (firestoreEnabled()) {
-    await (await db()).collection(COLLECTIONS.samples).doc(String(storedSample.id)).set({
+    const write = (await db()).collection(COLLECTIONS.samples).doc(String(storedSample.id)).set({
       ...storedSample,
       createdAt: new Date(),
     });
+    await Promise.race([
+      write,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore sample write timed out')), 20000)),
+    ]);
   }
   current.samples.push(storedSample);
   if (current.samples.length > CONFIG.maxSamples) {
